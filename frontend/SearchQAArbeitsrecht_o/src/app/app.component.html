@@ -1,0 +1,158 @@
+<!-- Background Video-->
+<img class="bg-img" source src="assets/img/bg-masthead.jpg" />
+<!-- <video class="bg-video" playsinline="playsinline" autoplay="autoplay" muted="muted" loop="loop"><source src="assets/mp4/bg.mp4" type="video/mp4" /></video> -->
+<!-- <video class="bg-video"><source src="assets/img/bg-masthead.jpg" /></video> -->
+<!-- Masthead-->
+<nav class="navbar navbar-dark bg-dark">
+  <a class="navbar-brand" href="#">Semantic Search QA</a>
+</nav>
+
+<div class="masthead h-50">
+    <div class="masthead-content text-white" >
+        <div class="container-fluid px-4 px-lg-0" style="width: 40vw;">
+          <h1 class="fst-italic lh-1 mb-4">Semantische Suche</h1>
+          <h2 class="mb-5">Frage-Antwort-System - Arbeitsrecht</h2>
+          <!-- Search Bar -->
+          <div class="row">
+            <div class="col">
+                <input class="form-control form-control-lg" [(ngModel)]='inputQ' type="text" placeholder="eine Frage zum Arbeitsrecht" />
+            </div>
+            <div class="col-auto"> <button class="btn btn-primary btn-lg" (click)="GetData()" type="button" >Suchen</button> </div>
+          </div>
+          <input type="checkbox" [(ngModel)]='semanticchecked'/> Semantisch &nbsp;&nbsp; <input type="checkbox" [(ngModel)]='kwchecked'/>Keyword
+
+          <!-- Vertical Scrolling -->
+          <div class="container mt-5">
+            <div class="scrolling">
+              <span class="dot"></span> 
+              <div  (click)="GetDataSpec1()"  class="btn fs-5 text-white" > Wann bekomme ich eine Abfindung mit Beispiel dazu? </div> 
+            </div>
+            <div class="scrolling" aria-hidden="true">
+              <span class="dot"></span> 
+              <div  (click)="GetDataSpec2()"  class="btn fs-5 text-white" > Habe ich Anspruch auf Dienstwagen? </div>    
+            </div>
+            <div class="scrolling" aria-hidden="true">
+              <span class="dot"></span> 
+              <div  (click)="GetDataSpec3()"  class="btn fs-5 text-white " > Wo finde ich Information zu Elternzeit? </div>          
+            </div>
+            <div class="scrolling" aria-hidden="true">
+              <span class="dot"></span> 
+              <div  (click)="GetDataSpec4()"  class="btn fs-5 text-white " > Darf ich Urlaub während der Probezeit nehmen? </div>           
+            </div>
+            <div class="scrolling" aria-hidden="true">
+              <span class="dot"></span> 
+              <div  (click)="GetDataSpec1()"  class="btn fs-5 text-white" > Wann bekomme ich eine Abfindung mit Beispiel dazu? </div> 
+            </div>
+          </div>
+        </div>
+
+        <!-- Horizontal Scrolling -->
+        <!-- <div class="container mt-5">
+          <div class="row">
+              <div class="col-md-12">
+                  <div class="d-flex justify-content-between align-items-center breaking-news ">
+                      <marquee class="news-scroll" behavior="scroll" direction="left" onmouseover="this.stop();" onmouseout="this.start();"> 
+                        <span class="dot"></span> 
+                        <a  (click)="GetDataSpec1()"  class="btn fs-6 text-white h5" > Wann bekomme ich eine Abfindung mit Beispiel dazu? </a> 
+                        <span class="dot"></span> 
+                        <a  (click)="GetDataSpec2()"  class="btn fs-6 text-white h5" > Habe ich Anspruch auf Dienstwagen? </a> 
+                        <span class="dot"></span> 
+                        <a  (click)="GetDataSpec3()"  class="btn fs-6 text-white h5" > Wo finde ich Information zu Elternzeit? </a> 
+                        <span class="dot"></span> 
+                        <a  (click)="GetDataSpec4()"  class="btn fs-6 text-white h5" > Darf ich Urlaub während der Probezeit nehmen? </a> </marquee>
+                  </div>
+              </div>
+          </div>
+        </div> -->
+
+    </div>
+    
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="js/scripts.js"></script>
+
+<!-- Result -->
+<div class="answercontainer">
+  <div id="result" class="question">
+    <li *ngIf="IsAsked" style="list-style-type:none">
+      <br>
+      <!-- <h2 class="text-white text-left">  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Frage:</h2>  -->
+      <h3 class="text-white text-left ">  <i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- {{inputQfeedback}}  </i></h3>
+      <br>
+    </li>
+  </div>
+  <div  class="question">
+  <!-- Semantic -->
+  <div *ngIf="IsAsked">
+  <ul *ngIf="semanticchecked">
+    <div class="col-md-12"> 
+      <div class="card-columns">
+        <h4 class="text-white text-left"> semantisch:</h4>
+        <!-- Filter -->
+        <span class="text-white text-left"> Score-Filter &nbsp;</span>
+        <!-- Filter-Slider -->
+        <input type="range" value="0" min="0" max={{filtersmscorehi}} step={{filterstepsm}} (change)="getSliderValuesm($event)" (oninput)="getSliderValuesm($event)"  />
+        <span class="text-white text-left"> &nbsp; ≥ {{filtervaluesm}} &nbsp; </span>
+        <button class="btn btn-primary btn-sm" (click)="FilterDatasm()" type="button" >filtern</button>
+        <h5 class="text-white text-left"> </h5>
+        <!-- Card for each result -->
+        <li *ngFor="let obj of filtersemanticresult" style="list-style-type:none">
+          <div class="card w-80" style="min-width: 40vw;">
+            <div class="card-body">
+              <h5 class="card-title">
+                <!-- 1 Score -->
+                <a type="button" class="btn {{obj.color}} btn-sm disabled" >{{obj.score.toFixed(2)}}</a> 
+                <!-- 2 Title -->
+                {{obj.body}}
+              </h5>
+              <!-- 3 Text -->
+              <p class="card-text"><app-read-more [text]="obj.body2" maxLength="25"></app-read-more></p> 
+              <a href="{{obj.link}}"  style="font-size: small; display: block; text-align: right;">link</a>
+            </div>
+          </div><br>
+        </li>
+      </div>
+    </div>
+  </ul>
+  </div>
+  <!-- Keyword -->
+  <div *ngIf="IsAsked">
+  <ul *ngIf="kwchecked">
+    <div class="col-md-12">
+      <div class="card-columns">
+        <h4 class="text-white text-left"> keyword: <br></h4>
+        <!-- Filter -->
+        <span class="text-white text-left"> Score-Filter &nbsp;</span>
+        <!-- Filter-Slider -->
+        <input type="range" value="0" min="0" max={{filterkwscorehi}}  (change)="getSliderValuekw($event)" (oninput)="getSliderValuekw($event)"  />
+        <span class="text-white text-left"> &nbsp; ≥ {{filtervaluekw}} &nbsp; </span>
+        <button class="btn btn-primary btn-sm" (click)="FilterDatakw()" type="button" >filtern</button>
+        <h5 class="text-white text-left"> </h5>
+        <!-- Card for each result -->
+        <li *ngFor="let obj of filterkwresult" style="list-style-type:none">
+          <div class="card w-80" style="min-width: 40vw;">
+            <div class="card-body">
+              <h5 class="card-title">
+                <!-- 1 Score -->
+                <a type="button" class="btn {{obj.color}} btn-sm disabled" >{{obj.score.toFixed(2)}}</a> 
+                <!-- 2 Title -->
+                {{obj.body}} 
+              </h5>
+              <!-- 3 Text -->
+              <p class="card-text"><app-read-more [text]="obj.body2" maxLength="25"></app-read-more></p>
+              <a href="{{obj.link}}"  style="font-size: small; display: block; text-align: right;">link</a>
+            </div>
+          </div><br>
+        </li>
+      </div>
+    </div>
+  </ul>
+  </div>
+    
+  </div>
+</div>
+<router-outlet></router-outlet>
+
+<!-- Material unchecked -->

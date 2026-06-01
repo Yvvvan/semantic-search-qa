@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantic-search-qa-search
+  labels:
+    app: semantic-search-qa-search
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: semantic-search-qa-search
+  template:
+    metadata:
+      labels:
+        app: semantic-search-qa-search
+    spec:
+      containers:
+        - name: search
+          image: ghcr.io/yvvvan/semantic-search-qa/search:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            - name: ELASTIC_HOST
+              value: semantic-search-qa-elastic
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5000
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 12
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: semantic-search-qa-search
+  labels:
+    app: semantic-search-qa-search
+spec:
+  selector:
+    app: semantic-search-qa-search
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: semantic-search-qa-search
+  labels:
+    app: semantic-search-qa-search
+spec:
+  to:
+    kind: Service
+    name: semantic-search-qa-search
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

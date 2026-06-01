@@ -1,0 +1,169 @@
+name: CI
+
+permissions:
+  contents: read
+  packages: write
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: frontend/SearchQAArbeitsrecht_o
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 14
+          cache: npm
+          cache-dependency-path: frontend/SearchQAArbeitsrecht_o/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build -- --configuration production
+
+  python-dependencies:
+    name: Python dependency check
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        service:
+          - indexES
+          - searchES
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+          cache: pip
+          cache-dependency-path: ${{ matrix.service }}/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile Python files
+        run: python -m compileall .
+
+      - name: Check Flask dependency compatibility
+        if: matrix.service == 'searchES'
+        run: python -c "from flask import Flask; import werkzeug; print('flask import ok')"
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-22.04
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAMESPACE: yvvvan/semantic-search-qa
+    strategy:
+      matrix:
+        image:
+          - name: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+          - name: search
+            context: searchES
+            dockerfile: searchES/Dockerfile
+          - name: index
+            context: indexES
+            dockerfile: indexES/Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build ${{ matrix.image.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image.name }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image.name }}:sha-${{ github.sha }}
+
+  deploy-openshift:
+    name: Deploy to OpenShift
+    runs-on: ubuntu-22.04
+    needs:
+      - docker-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          namespace: ${{ secrets.OPENSHIFT_NAMESPACE }}
+          insecure_skip_tls_verify: true
+
+      - name: Deploy Elasticsearch
+        run: |
+          oc project "${{ secrets.OPENSHIFT_NAMESPACE }}"
+          oc apply -f .openshift/elasticsearch.yml
+          oc rollout status deployment/semantic-search-qa-elastic --timeout=8m
+
+      - name: Deploy application services
+        run: |
+          oc apply -f .openshift/search.yml
+          oc apply -f .openshift/frontend.yml
+          oc rollout restart deployment/semantic-search-qa-search
+          oc rollout restart deployment/semantic-search-qa-frontend
+          oc rollout status deployment/semantic-search-qa-search --timeout=12m
+          oc rollout status deployment/semantic-search-qa-frontend --timeout=5m
+
+      - name: Run index job
+        run: |
+          oc delete job semantic-search-qa-index --ignore-not-found
+          oc apply -f .openshift/index-job.yml
+          oc wait --for=condition=complete job/semantic-search-qa-index --timeout=20m
+
+      - name: Show routes
+        run: oc get routes
+
+      - name: Deployment diagnostics
+        if: failure()
+        run: |
+          oc get pods,deployments,replicasets,services,routes,jobs || true
+          oc get events --sort-by=.lastTimestamp | tail -n 80 || true
+          oc describe deployment/semantic-search-qa-frontend || true
+          oc describe deployment/semantic-search-qa-search || true
+          oc describe deployment/semantic-search-qa-elastic || true
+          oc logs deployment/semantic-search-qa-frontend --all-containers --tail=120 || true
+          oc logs deployment/semantic-search-qa-search --all-containers --tail=120 || true
+          oc logs deployment/semantic-search-qa-elastic --all-containers --tail=120 || true
+          oc logs job/semantic-search-qa-index --all-containers --tail=120 || true

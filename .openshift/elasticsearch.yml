@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantic-search-qa-elastic
+  labels:
+    app: semantic-search-qa-elastic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: semantic-search-qa-elastic
+  template:
+    metadata:
+      labels:
+        app: semantic-search-qa-elastic
+    spec:
+      containers:
+        - name: elasticsearch
+          image: elasticsearch:7.13.1
+          ports:
+            - containerPort: 9200
+              name: http
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: ES_JAVA_OPTS
+              value: -Xms512m -Xmx512m
+            - name: bootstrap.memory_lock
+              value: "false"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: elastic-data
+              mountPath: /usr/share/elasticsearch/data
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+      volumes:
+        - name: elastic-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: semantic-search-qa-elastic
+  labels:
+    app: semantic-search-qa-elastic
+spec:
+  selector:
+    app: semantic-search-qa-elastic
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200

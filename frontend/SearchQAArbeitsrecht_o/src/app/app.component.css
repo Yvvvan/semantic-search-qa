@@ -1,0 +1,73 @@
+.container {
+    width: 1024px;
+    height: 50px;
+    overflow: hidden;
+}
+  
+.scrolling {
+    animation: marquee 8s linear infinite;
+}
+
+@keyframes marquee {
+    from {
+        transform: translateY(0%);
+    }
+    to { 
+        transform: translateY(-395%);
+    }
+}
+
+.news {
+    width: 180px;
+}
+
+.news-scroll a {
+    text-decoration: none
+}
+  
+.dot {
+    height: 6px;
+    width: 6px;
+    margin-left: 3px;
+    margin-right: 3px;
+    margin-bottom: 4px !important;
+    background-color: rgb(207, 23, 23);
+    border-radius: 50%;
+    display: inline-block
+}
+
+.question {
+    position: relative;
+    overflow: hidden;
+    z-index: 2;
+    display: flex;
+    align-items: left;
+    justify-content: left;
+    /* margin-top:8rem; */
+    padding-left: 5rem;
+    padding-right: 5rem;
+    background-color: rgba(0, 0, 0, 0.85);
+}
+.question:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+}
+
+.answercontainer {
+    padding-right: 0;
+    padding-left: 0;
+    margin-right: auto;
+    margin-left: auto;
+    overflow:hidden;
+    min-height:2000px;
+}
+
+.card-columns {
+    column-count: 1;
+}

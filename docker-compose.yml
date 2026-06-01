@@ -1,0 +1,61 @@
+version: '3'
+services:
+    myelastic:
+        #build: .
+        image: elasticsearch:7.13.1
+        container_name: semantic-search-qa-elastic
+        environment:
+            - bootstrap.memory_lock=true
+            - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+            - "discovery.type=single-node"
+        networks: 
+            - elastic
+
+    myfrontend:
+        build: 
+            context: ./frontend/
+            dockerfile: Dockerfile.dev
+        container_name: myfrontend
+        ports: 
+            - "4200:4200"
+        networks: 
+            - elastic
+
+    mysearch:
+        build: ./searchES
+        container_name: mysearch
+        environment:
+            ELASTICSEARCH_URL: http://elastic:9200
+            ELASTICSEARCH_HOSTS: http://elastic:9200    
+        ports: 
+            - "5000:5000"
+        networks: 
+            - elastic
+        command: 
+            - /bin/bash 
+            - -c 
+            - | 
+                sleep 10s
+                python3 searchES_FlaskAPI.py
+            #/bin/bash -c "sleep 10s && python3 searchES_FlaskAPI.py"
+        restart: on-failure
+            
+    myindex:
+        build: ./indexES
+        container_name: myindex 
+        #entrypoint: /bin/true    # commit it by initial 
+        networks:
+            - elastic
+        command: 
+            - /bin/bash 
+            - -c 
+            - | 
+                sleep 10s
+                python3 indexES.py
+            # CMD /bin/bash -c "sleep 45s ; python3 indexES.py"
+        restart: on-failure
+
+networks:
+    elastic:
+
+    

@@ -1,0 +1,138 @@
+stages:
+    - build
+    - deploy
+    - maintain
+
+#job templates:
+.deploy: &deploy
+    stage: deploy
+    variables:
+        CI_OPENSHIFT_PROJECT_NAME: "semantic-search-qa"
+        CI_IMAGE_TAG: "latest"
+    image:
+        name: openshift/origin-cli
+    before_script:
+        - oc login "$OSC_SERVER" --token="$OSC_TOKEN" --insecure-skip-tls-verify
+        - oc project "$CI_OPENSHIFT_PROJECT_NAME"
+    script:
+        #only update imagestreams for previosly manually created deployments
+        - oc tag $CI_REGISTRY_IMAGE/$CI_IMAGE_APPENDIX:$CI_IMAGE_TAG $OSC_IMAGESTREAM_NAME:$CI_IMAGE_TAG
+
+.openshift-job: &openshift-job
+    stage: maintain
+    image:
+        name: openshift/origin-cli
+    variables:
+        CI_OPENSHIFT_PROJECT_NAME: "semantic-search-qa"
+        CI_OPENSHIFT_JOB_NAME: "laws-indexer"
+        CI_ADDITIONAL_OC_RUN_ARGS: ""
+        CI_IMAGE_APPENDIX: ""
+        CI_IMAGE_TAG: "latest"
+    before_script:
+        - oc login "$OSC_SERVER" --token="$OSC_TOKEN" --insecure-skip-tls-verify
+        - oc project "$CI_OPENSHIFT_PROJECT_NAME"
+    script:
+        - oc run -i $CI_OPENSHIFT_JOB_NAME --image="$CI_REGISTRY_IMAGE$CI_IMAGE_APPENDIX:$CI_IMAGE_TAG" --image-pull-policy="Always" --restart=Never --rm=true $CI_ADDITIONAL_OC_RUN_ARGS
+    when: manual
+    only:
+        refs:
+            - master
+    
+#container builds
+
+########################################
+build-frontend:
+    stage: build
+    image:
+      name: gcr.io/kaniko-project/executor:debug
+      entrypoint: [""]
+    variables:
+        CI_IMAGE_APPENDIX: "myfrontend"
+        CI_DOCKER_CONTEXT: $CI_PROJECT_DIR/frontend    
+    script:
+        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+        - /kaniko/executor --context $CI_DOCKER_CONTEXT --dockerfile $CI_DOCKER_CONTEXT/Dockerfile --destination $CI_REGISTRY_IMAGE/$CI_IMAGE_APPENDIX:latest
+    only:
+        refs:
+            - master
+        changes:
+            - frontend/**/*
+
+build-searchES:
+    stage: build
+    image:
+      name: gcr.io/kaniko-project/executor:debug
+      entrypoint: [""]
+    variables:
+        CI_IMAGE_APPENDIX: "mysearch"
+        CI_DOCKER_CONTEXT: $CI_PROJECT_DIR/searchES    
+    script:
+        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+        - /kaniko/executor --context $CI_DOCKER_CONTEXT --dockerfile $CI_DOCKER_CONTEXT/Dockerfile --destination $CI_REGISTRY_IMAGE/$CI_IMAGE_APPENDIX:latest
+    only:
+        refs:
+            - master
+        changes:
+            - searchES/*
+
+build-indexES:
+    stage: build
+    image:
+      name: gcr.io/kaniko-project/executor:debug
+      entrypoint: [""]
+    variables:
+        CI_IMAGE_APPENDIX: "myindex"
+        CI_DOCKER_CONTEXT: $CI_PROJECT_DIR/indexES    
+    script:
+        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+        - /kaniko/executor --context $CI_DOCKER_CONTEXT --dockerfile $CI_DOCKER_CONTEXT/Dockerfile --destination $CI_REGISTRY_IMAGE/$CI_IMAGE_APPENDIX:latest
+    only:
+        refs:
+            - master
+        changes:
+            - indexES/*
+
+
+#deploy
+##############################
+deploy-frontend-master:
+    <<: *deploy
+    variables:
+        CI_OPENSHIFT_PROJECT_NAME: "semantic-search-qa"
+        CI_IMAGE_TAG: "latest"
+        CI_IMAGE_APPENDIX: myfrontend
+        OSC_IMAGESTREAM_NAME: "semantic-search-qa-frontend"
+    only:
+        refs:
+            - master
+        changes:
+            - frontend/**/*
+
+# deploy-es-master:
+
+deploy-searchES-master:
+    <<: *deploy
+    variables:
+        CI_OPENSHIFT_PROJECT_NAME: "semantic-search-qa"
+        CI_IMAGE_TAG: "latest"
+        CI_IMAGE_APPENDIX: mysearch
+        OSC_IMAGESTREAM_NAME: "semantic-search-qa-backend"
+    only:
+        refs:
+            - master
+        changes:
+            - searchES/*
+
+deploy-indexES-master:
+    <<: *deploy
+    variables:
+        CI_OPENSHIFT_PROJECT_NAME: "semantic-search-qa"
+        CI_IMAGE_TAG: "latest"
+        CI_IMAGE_APPENDIX: myindex
+        OSC_IMAGESTREAM_NAME: "semantic-search-qa-index"
+    only:
+        refs:
+            - master
+        changes:
+            - indexES/*
+    
